@@ -1,0 +1,8 @@
+{
+  "name": "PM Cockpit Pro",
+  "description": "A comprehensive Project Management cockpit with Control, Definition, Planning, Execution, and AI-driven business rules configuration powered by Mahathi AI Solutions.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

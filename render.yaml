@@ -1,0 +1,17 @@
+# PM Cockpit Pro — Render Deployment Config
+# Render reads this file automatically to configure the service
+
+services:
+  - type: web
+    name: pmo-cockpit-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false          # Set manually in Render dashboard
+      - key: FRONTEND_URL
+        sync: false          # Set manually after Vercel deployment
