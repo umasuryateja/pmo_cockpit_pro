@@ -12,10 +12,9 @@ router.get("/all", async (req, res) => {
   }
 });
 
-// CREATE project
+// CREATE project (always INSERT — never updates an existing row)
 router.post("/create", async (req, res) => {
   try {
-
     const {
       project_code,
       project_name,
@@ -26,27 +25,36 @@ router.post("/create", async (req, res) => {
       planned_start
     } = req.body;
 
+    if (!project_name || !String(project_name).trim()) {
+      return res.status(400).json({ error: "project_name is required" });
+    }
+    if (!project_code || !String(project_code).trim()) {
+      return res.status(400).json({ error: "project_code is required" });
+    }
+
     const project = await pool.query(
       `INSERT INTO projects
       (project_code, project_name, client_name, project_manager, industry, priority_level, planned_start)
       VALUES ($1,$2,$3,$4,$5,$6,$7)
       RETURNING *`,
       [
-        project_code,
-        project_name,
-        client_name,
-        project_manager,
-        industry,
-        priority_level,
-        planned_start
+        String(project_code).trim(),
+        String(project_name).trim(),
+        client_name || null,
+        project_manager || null,
+        industry || null,
+        priority_level || "Standard",
+        planned_start || null
       ]
     );
 
-    res.json(project.rows[0]);
-
+    res.status(201).json(project.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Create project error");
+    console.error("[Projects] Create error:", err.message);
+    if (err.code === "23505") {
+      return res.status(409).json({ error: "Project code already exists. Use a unique code." });
+    }
+    res.status(500).json({ error: "Create project error" });
   }
 });
 
@@ -349,4 +357,4 @@ router.delete("/bom/delete/:id", async (req, res) => {
 
 module.exports = router;
 
-
+

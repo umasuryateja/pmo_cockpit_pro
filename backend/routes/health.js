@@ -167,10 +167,14 @@ router.post("/ai-summary/:projectId", async (req, res) => {
     const { ai_summary, ai_recommendations } = req.body;
 
     await pool.query(
-      `UPDATE project_health_scores
-       SET ai_summary = $1, ai_recommendations = $2, computed_at = NOW()
-       WHERE project_id = $3`,
-      [ai_summary || "", ai_recommendations || "", projectId]
+      `INSERT INTO project_health_scores (project_id, score, rag_status, ai_summary, ai_recommendations, computed_at)
+       VALUES ($1, 0, 'Unknown', $2, $3, NOW())
+       ON CONFLICT (project_id)
+       DO UPDATE SET
+         ai_summary = EXCLUDED.ai_summary,
+         ai_recommendations = EXCLUDED.ai_recommendations,
+         computed_at = NOW()`,
+      [projectId, ai_summary || "", ai_recommendations || ""]
     );
 
     res.json({ message: "AI summary saved successfully" });

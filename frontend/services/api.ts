@@ -1,18 +1,42 @@
-// In production: set VITE_API_BASE to your Render backend URL (e.g. https://pm-cockpit-backend.onrender.com)
-// In development: falls back to http://localhost:5001
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:5001";
+// Production (Vercel): set VITE_API_BASE to your Render URL (no trailing slash).
+// Development: defaults to http://localhost:5001
+function resolveApiBase(): string {
+  const fromEnv = (import.meta.env.VITE_API_BASE as string | undefined)?.trim().replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+  if (import.meta.env.DEV) return "http://localhost:5001";
+  return "";
+}
 
+const API_BASE = resolveApiBase();
+
+function apiUrl(path: string): string {
+  if (!API_BASE) {
+    throw new Error(
+      "Backend URL is not configured. Set VITE_API_BASE in Vercel to your Render API URL (e.g. https://pmo-cockpit-api.onrender.com), then redeploy."
+    );
+  }
+  return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
 
 export const getProjects = async () => {
-  const res = await fetch(`${API_BASE}/projects/all`);
+  const res = await fetch(apiUrl("/projects/all"));
 
   if (!res.ok) throw new Error("Failed to fetch projects");
 
   return res.json();
 };
 
+async function parseApiError(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return data?.error || data?.message || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export const createProject = async (project: any) => {
-  const res = await fetch(`${API_BASE}/projects/create`, {
+  const res = await fetch(apiUrl("/projects/create"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -20,13 +44,15 @@ export const createProject = async (project: any) => {
     body: JSON.stringify(project),
   });
 
-  if (!res.ok) throw new Error("Failed to create project");
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, "Failed to create project"));
+  }
 
   return res.json();
 };
 
 export const updateProject = async (id: number, data: any) => {
-  const res = await fetch(`${API_BASE}/projects/update/${id}`, {
+  const res = await fetch(apiUrl(`/projects/update/${id}`), {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -43,7 +69,7 @@ export const updateProject = async (id: number, data: any) => {
 /* ---------------------- DELIVERABLES ---------------------- */
 
 export const getDeliverables = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/deliverables/${projectId}`);
+  const res = await fetch(apiUrl(`/deliverables/${projectId}`));
 
   if (!res.ok) throw new Error("Failed to fetch deliverables");
 
@@ -51,7 +77,7 @@ export const getDeliverables = async (projectId: number) => {
 };
 
 export const createDeliverable = async (data: any) => {
-  const res = await fetch(`${API_BASE}/deliverables/create`, {
+  const res = await fetch(apiUrl("/deliverables/create"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -68,7 +94,7 @@ export const createDeliverable = async (data: any) => {
 /* ---------------------- ACTIVITIES ---------------------- */
 
 export const getActivities = async (deliverableId: number) => {
-  const res = await fetch(`${API_BASE}/activities/${deliverableId}`);
+  const res = await fetch(apiUrl(`/activities/${deliverableId}`));
 
   if (!res.ok) throw new Error("Failed to fetch activities");
 
@@ -79,7 +105,7 @@ export const getActivities = async (deliverableId: number) => {
 /* ---------------------- BULK SAVE ACTIVITIES ---------------------- */
 
 export const bulkSaveActivities = async (deliverableId: number, tasks: any[]) => {
-  const res = await fetch(`${API_BASE}/activities/bulk-save`, {
+  const res = await fetch(apiUrl("/activities/bulk-save"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -97,16 +123,14 @@ export const bulkSaveActivities = async (deliverableId: number, tasks: any[]) =>
 
 /* ---------------------- DOCUMENTS ---------------------- */
 
-/* ---------------------- DOCUMENTS ---------------------- */
-
 export const getDocuments = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/documents/${projectId}`);
+  const res = await fetch(apiUrl(`/documents/${projectId}`));
   if (!res.ok) throw new Error("Failed to fetch documents");
   return res.json();
 };
 
 export const downloadDocument = (fileName: string) => {
-  window.open(`${API_BASE}/documents/download/${fileName}`);
+  window.open(apiUrl(`/documents/download/${fileName}`));
 };
 
 export const uploadDocument = async (file: File, projectId: number) => {
@@ -116,7 +140,7 @@ export const uploadDocument = async (file: File, projectId: number) => {
   formData.append("file", file);
   formData.append("project_id", projectId.toString());
 
-  const res = await fetch(`${API_BASE}/documents/upload`, {
+  const res = await fetch(apiUrl("/documents/upload"), {
     method: "POST",
     body: formData
   });
@@ -128,12 +152,12 @@ export const uploadDocument = async (file: File, projectId: number) => {
 };
 
 export const getCallRecordings = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/calls/${projectId}`);
+  const res = await fetch(apiUrl(`/calls/${projectId}`));
   return await res.json();
 };
 
 export const createCallRecording = async (data: any) => {
-  const res = await fetch(`${API_BASE}/calls/create`, {
+  const res = await fetch(apiUrl("/calls/create"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
@@ -144,13 +168,13 @@ export const createCallRecording = async (data: any) => {
 /* ---------------------- DEFINE MODULE API HELPERS ---------------------- */
 
 export const getScopeItems = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/projects/scope/${projectId}`);
+  const res = await fetch(apiUrl(`/projects/scope/${projectId}`));
   if (!res.ok) throw new Error("Failed to fetch scope items");
   return res.json();
 };
 
 export const createScopeItem = async (data: any) => {
-  const res = await fetch(`${API_BASE}/projects/scope/create`, {
+  const res = await fetch(apiUrl("/projects/scope/create"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -160,13 +184,13 @@ export const createScopeItem = async (data: any) => {
 };
 
 export const getMilestones = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/projects/milestones/${projectId}`);
+  const res = await fetch(apiUrl(`/projects/milestones/${projectId}`));
   if (!res.ok) throw new Error("Failed to fetch milestones");
   return res.json();
 };
 
 export const createMilestone = async (data: any) => {
-  const res = await fetch(`${API_BASE}/projects/milestones/create`, {
+  const res = await fetch(apiUrl("/projects/milestones/create"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -176,13 +200,13 @@ export const createMilestone = async (data: any) => {
 };
 
 export const getRisks = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/projects/risks/${projectId}`);
+  const res = await fetch(apiUrl(`/projects/risks/${projectId}`));
   if (!res.ok) throw new Error("Failed to fetch risks");
   return res.json();
 };
 
 export const createRisk = async (data: any) => {
-  const res = await fetch(`${API_BASE}/projects/risks/create`, {
+  const res = await fetch(apiUrl("/projects/risks/create"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -192,13 +216,13 @@ export const createRisk = async (data: any) => {
 };
 
 export const getStakeholders = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/projects/stakeholders/${projectId}`);
+  const res = await fetch(apiUrl(`/projects/stakeholders/${projectId}`));
   if (!res.ok) throw new Error("Failed to fetch stakeholders");
   return res.json();
 };
 
 export const createStakeholder = async (data: any) => {
-  const res = await fetch(`${API_BASE}/projects/stakeholders/create`, {
+  const res = await fetch(apiUrl("/projects/stakeholders/create"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -208,13 +232,13 @@ export const createStakeholder = async (data: any) => {
 };
 
 export const getBomItems = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/projects/bom/${projectId}`);
+  const res = await fetch(apiUrl(`/projects/bom/${projectId}`));
   if (!res.ok) throw new Error("Failed to fetch BOM items");
   return res.json();
 };
 
 export const createBomItem = async (data: any) => {
-  const res = await fetch(`${API_BASE}/projects/bom/create`, {
+  const res = await fetch(apiUrl("/projects/bom/create"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -224,7 +248,7 @@ export const createBomItem = async (data: any) => {
 };
 
 export const deleteProject = async (id: number) => {
-  const res = await fetch(`${API_BASE}/projects/delete/${id}`, {
+  const res = await fetch(apiUrl(`/projects/delete/${id}`), {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete project");
@@ -232,7 +256,7 @@ export const deleteProject = async (id: number) => {
 };
 
 export const deleteScopeItem = async (id: number) => {
-  const res = await fetch(`${API_BASE}/projects/scope/delete/${id}`, {
+  const res = await fetch(apiUrl(`/projects/scope/delete/${id}`), {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete scope item");
@@ -240,7 +264,7 @@ export const deleteScopeItem = async (id: number) => {
 };
 
 export const deleteMilestone = async (id: number) => {
-  const res = await fetch(`${API_BASE}/projects/milestones/delete/${id}`, {
+  const res = await fetch(apiUrl(`/projects/milestones/delete/${id}`), {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete milestone");
@@ -248,7 +272,7 @@ export const deleteMilestone = async (id: number) => {
 };
 
 export const deleteRisk = async (id: number) => {
-  const res = await fetch(`${API_BASE}/projects/risks/delete/${id}`, {
+  const res = await fetch(apiUrl(`/projects/risks/delete/${id}`), {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete risk");
@@ -256,7 +280,7 @@ export const deleteRisk = async (id: number) => {
 };
 
 export const deleteStakeholder = async (id: number) => {
-  const res = await fetch(`${API_BASE}/projects/stakeholders/delete/${id}`, {
+  const res = await fetch(apiUrl(`/projects/stakeholders/delete/${id}`), {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete stakeholder");
@@ -264,7 +288,7 @@ export const deleteStakeholder = async (id: number) => {
 };
 
 export const deleteBomItem = async (id: number) => {
-  const res = await fetch(`${API_BASE}/projects/bom/delete/${id}`, {
+  const res = await fetch(apiUrl(`/projects/bom/delete/${id}`), {
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete BOM item");
@@ -274,13 +298,13 @@ export const deleteBomItem = async (id: number) => {
 /* ─────────────────────────────── FEATURE 1: HEALTH SCORING ─────────────────────────────── */
 
 export const getProjectHealthScore = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/health/score/${projectId}`);
+  const res = await fetch(apiUrl(`/health/score/${projectId}`));
   if (!res.ok) throw new Error("Failed to fetch health score");
   return res.json();
 };
 
 export const computeProjectHealth = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/health/analyze/${projectId}`, { method: "POST" });
+  const res = await fetch(apiUrl(`/health/analyze/${projectId}`), { method: "POST" });
   if (!res.ok) throw new Error("Failed to compute health score");
   return res.json();
 };
@@ -290,7 +314,7 @@ export const saveHealthAISummary = async (
   ai_summary: string,
   ai_recommendations: string
 ) => {
-  const res = await fetch(`${API_BASE}/health/ai-summary/${projectId}`, {
+  const res = await fetch(apiUrl(`/health/ai-summary/${projectId}`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ai_summary, ai_recommendations }),
@@ -302,7 +326,7 @@ export const saveHealthAISummary = async (
 /* ─────────────────────────────── FEATURE 2: PROJECT NOTES ──────────────────────────────── */
 
 export const getNotes = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/notes/${projectId}`);
+  const res = await fetch(apiUrl(`/notes/${projectId}`));
   if (!res.ok) throw new Error("Failed to fetch notes");
   return res.json();
 };
@@ -313,7 +337,7 @@ export const createNote = async (data: {
   content: string;
   created_by?: string;
 }) => {
-  const res = await fetch(`${API_BASE}/notes/create`, {
+  const res = await fetch(apiUrl("/notes/create"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -323,7 +347,7 @@ export const createNote = async (data: {
 };
 
 export const updateNote = async (noteId: number, title: string, content: string) => {
-  const res = await fetch(`${API_BASE}/notes/update/${noteId}`, {
+  const res = await fetch(apiUrl(`/notes/update/${noteId}`), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, content }),
@@ -333,7 +357,7 @@ export const updateNote = async (noteId: number, title: string, content: string)
 };
 
 export const deleteNote = async (noteId: number) => {
-  const res = await fetch(`${API_BASE}/notes/delete/${noteId}`, { method: "DELETE" });
+  const res = await fetch(apiUrl(`/notes/delete/${noteId}`), { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete note");
   return res.json();
 };
@@ -347,7 +371,7 @@ export const bulkInsertKickoffData = async (payload: {
   risks: any[];
   stakeholders: any[];
 }) => {
-  const res = await fetch(`${API_BASE}/kickoff/bulk-insert`, {
+  const res = await fetch(apiUrl("/kickoff/bulk-insert"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -364,7 +388,7 @@ export const saveRiskAIScore = async (
   risk_level: string,
   ai_recommendation: string
 ) => {
-  const res = await fetch(`${API_BASE}/risks/ai-score/${riskId}`, {
+  const res = await fetch(apiUrl(`/risks/ai-score/${riskId}`), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ risk_score, risk_level, ai_recommendation }),
@@ -376,7 +400,7 @@ export const saveRiskAIScore = async (
 /* ─────────────────────────────── FEATURE 5: REPORT AGGREGATION ─────────────────────────── */
 
 export const getReportAggregate = async (projectId: number) => {
-  const res = await fetch(`${API_BASE}/reports/aggregate/${projectId}`);
+  const res = await fetch(apiUrl(`/reports/aggregate/${projectId}`));
   if (!res.ok) throw new Error("Failed to aggregate report data");
   return res.json();
 };

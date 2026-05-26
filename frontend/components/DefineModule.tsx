@@ -212,16 +212,33 @@ const DefineModule: React.FC = () => {
     }
   };
 
-  // ── Feature 3: Generate AI kickoff data ──────────────────
-  const handleGenerateKickoff = async () => {
+  const clearProjectDetailState = () => {
+    setScopeItems([]);
+    setMilestones([]);
+    setRisks([]);
+    setStakeholders([]);
+    setBomItems([]);
+    setHealthScore(null);
+    setHealthAI(null);
+    setShowHealthDetail(false);
+    setManager('');
+    setIndustry('');
+    setPriority('');
+  };
+
+  // ── Feature 3: Generate AI kickoff data (always pass explicit project) ──
+  const handleGenerateKickoff = async (project?: any) => {
+    const target = project || lastCreatedProject;
+    if (!target?.project_id) return;
+
     setKickoffLoading(true);
     setKickoffData(null);
     try {
       const data = await generateKickoffData(
-        lastCreatedProject?.project_name || projectForm.name,
-        lastCreatedProject?.industry || projectForm.industry || 'Enterprise Tech',
-        lastCreatedProject?.priority_level || projectForm.priority || 'Standard',
-        lastCreatedProject?.planned_start || projectForm.startDate || new Date().toISOString().split('T')[0]
+        target.project_name,
+        target.industry || 'Enterprise Tech',
+        target.priority_level || 'Standard',
+        target.planned_start || new Date().toISOString().split('T')[0]
       );
       if (!data) {
         alert('AI kickoff generation failed. This may be due to an invalid or unconfigured API key.\n\nPlease check that GEMINI_API_KEY is set correctly in frontend/.env.local');
@@ -240,11 +257,12 @@ const DefineModule: React.FC = () => {
 
   // ── Feature 3: Accept kickoff and insert into DB ─────────
   const handleAcceptKickoff = async () => {
-    if (!kickoffData || !lastCreatedProject) return;
+    const target = lastCreatedProject;
+    if (!kickoffData || !target?.project_id) return;
     setKickoffInserting(true);
     try {
       await bulkInsertKickoffData({
-        projectId: lastCreatedProject.project_id,
+        projectId: Number(target.project_id),
         scopeItems:   kickoffData.scope_items   || [],
         milestones:   kickoffData.milestones    || [],
         risks:        kickoffData.risks         || [],
@@ -252,7 +270,7 @@ const DefineModule: React.FC = () => {
       });
       setModalType(null);
       setKickoffData(null);
-      alert(`AI kickoff data inserted successfully for ${lastCreatedProject.project_name}!`);
+      alert(`AI kickoff data inserted successfully for ${target.project_name}!`);
       loadProjects();
     } catch (e) {
       console.error("Kickoff insert failed:", e);
@@ -296,8 +314,12 @@ const DefineModule: React.FC = () => {
     }
   };
 
-  const handleAddProject = () => {
+  const handleAddProject = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setSelectedProject(null);
+    clearProjectDetailState();
+    setLastCreatedProject(null);
+    setKickoffData(null);
     setProjectForm({
       name: '',
       description: '',
@@ -310,12 +332,18 @@ const DefineModule: React.FC = () => {
 
   const handleCreateProjectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectForm.name) return;
+    const trimmedName = projectForm.name.trim();
+    if (!trimmedName) return;
+
+    const uniqueSuffix =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID().slice(0, 8).toUpperCase()
+        : String(Date.now());
 
     const newProject = {
-      project_code: "PRJ-" + Date.now(),
-      project_name: projectForm.name,
-      client_name: projectForm.description || "Client Corporation",
+      project_code: `PRJ-${uniqueSuffix}`,
+      project_name: trimmedName,
+      client_name: projectForm.description?.trim() || "Client Corporation",
       project_manager: "Alex Johnson",
       industry: projectForm.industry || "Enterprise Tech",
       priority_level: projectForm.priority || "Standard",
@@ -324,37 +352,63 @@ const DefineModule: React.FC = () => {
 
     try {
       const created = await createProject(newProject);
+      if (!created?.project_id) {
+        throw new Error('Server did not return a new project id');
+      }
+
       setLastCreatedProject(created);
       setModalType(null);
       setSelectedProject(null);
-      loadProjects();
-      // Offer AI kickoff after project creation
-      if (projectForm.name && created?.project_id) {
-        setTimeout(() => {
-          const wantAI = window.confirm(
-            `Project "${projectForm.name}" created!\n\nWould you like to use AI to generate a kickoff plan?\n(Scope items, milestones, risks, and stakeholders)`
+      clearProjectDetailState();
+      setProjectForm({
+        name: '',
+        description: '',
+        priority: 'Standard',
+        industry: '',
+        startDate: new Date().toISOString().split('T')[0]
+      });
+
+      setProjects((prev) => {
+        const id = Number(created.project_id);
+        if (prev.some((p) => Number(p.project_id) === id)) {
+          return prev.map((p) =>
+            Number(p.project_id) === id ? { ...p, ...created } : p
           );
-          if (wantAI) {
-            handleGenerateKickoff();
-          }
-        }, 300);
+        }
+        return [...prev, created].sort(
+          (a, b) => Number(a.project_id) - Number(b.project_id)
+        );
+      });
+      loadProjects();
+
+      const wantAI = window.confirm(
+        `Project "${trimmedName}" created (ID: ${created.project_id}).\n\nWould you like AI to generate a kickoff plan?\n(Scope items, milestones, risks, and stakeholders)`
+      );
+      if (wantAI) {
+        await handleGenerateKickoff(created);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Error creating project.");
+      alert(err?.message || "Error creating project.");
     }
   };
 
-  const handleDeleteProject = async () => {
-    if (!selectedProject) return;
-    if (!window.confirm(`Are you sure you want to delete the project "${selectedProject.project_name}"? This action cannot be undone.`)) {
+  const handleDeleteProject = async (project?: any) => {
+    const target = project || selectedProject;
+    if (!target?.project_id) return;
+    if (!window.confirm(`Delete project "${target.project_name}"? This cannot be undone.`)) {
       return;
     }
 
+    const deletedId = Number(target.project_id);
     try {
-      await deleteProject(selectedProject.project_id);
-      alert("Project Deleted Successfully!");
+      await deleteProject(deletedId);
       setSelectedProject(null);
+      clearProjectDetailState();
+      if (lastCreatedProject?.project_id === deletedId) {
+        setLastCreatedProject(null);
+      }
+      setProjects((prev) => prev.filter((p) => Number(p.project_id) !== deletedId));
       loadProjects();
     } catch (err) {
       console.error(err);
@@ -461,12 +515,15 @@ const DefineModule: React.FC = () => {
 
   const handleAddRisk = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!riskForm.title) return;
+    if (!riskForm.title || !selectedProject?.project_id) return;
     try {
-      await createRisk({ project_id: selectedProject.project_id, ...riskForm });
+      const created = await createRisk({ project_id: selectedProject.project_id, ...riskForm });
       setRiskForm({ title: '', impact: 'Medium', probability: 'Medium', mitigation: '', owner: '', status: 'Open' });
       setModalType(null);
-      loadProjectDetails(selectedProject.project_id);
+      await loadProjectDetails(selectedProject.project_id);
+      if (created?.risk_id) {
+        handleScoreRisk({ ...created, risk_id: created.risk_id });
+      }
     } catch (err) {
       console.error(err);
     }
@@ -515,6 +572,7 @@ const DefineModule: React.FC = () => {
             </p>
           </div>
           <button
+            type="button"
             onClick={handleAddProject}
             className="bg-[#1F3A8A] hover:bg-indigo-900 text-white px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all shadow-md shadow-indigo-100 active:scale-95"
           >
@@ -527,8 +585,19 @@ const DefineModule: React.FC = () => {
             <div
               key={project.project_id}
               onClick={() => setSelectedProject(project)}
-              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-400 transition-all duration-300 cursor-pointer group flex flex-col h-full transform hover:-translate-y-1"
+              className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-indigo-400 transition-all duration-300 cursor-pointer group flex flex-col h-full transform hover:-translate-y-1 relative"
             >
+              <button
+                type="button"
+                title="Delete project"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteProject(project);
+                }}
+                className="absolute top-4 right-4 p-2 rounded-lg text-slate-300 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+              >
+                <Trash2 size={16}/>
+              </button>
               <div className="flex justify-between items-start mb-4">
                 <div className="bg-indigo-50 p-3 rounded-2xl text-[#1F3A8A] border border-indigo-100 group-hover:bg-[#1F3A8A] group-hover:text-white transition-all duration-300">
                   <Briefcase size={22}/>
@@ -688,7 +757,8 @@ const DefineModule: React.FC = () => {
 
         <div className="flex gap-3">
           <button 
-            onClick={handleDeleteProject}
+            type="button"
+            onClick={() => handleDeleteProject()}
             className="px-5 py-2.5 text-xs font-bold text-red-600 border border-red-200 rounded-xl bg-white hover:bg-red-50 transition-all flex items-center gap-1.5"
           >
             <Trash2 size={14}/> Delete Project

@@ -39,3 +39,5 @@ backend/uploads/
 
 # ── Migration exports (optional — remove if you want to commit them) ─
 # backend/migrations/000_seed_data.sql
+
+.vercel

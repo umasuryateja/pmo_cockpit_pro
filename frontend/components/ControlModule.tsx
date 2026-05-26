@@ -1,12 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dashboard } from './Dashboard';
 import { ModuleTabs } from './ModuleTabs';
 import { DataTable } from './DataTable';
 import { COLORS } from '../constants';
 import { FileText, Sparkles, Loader2, ChevronRight, Bot, Download, RefreshCw } from 'lucide-react';
-import { getProjects } from '../services/api';
-import { getReportAggregate } from '../services/api';
+import { getProjects, getReportAggregate, getRisks } from '../services/api';
 import { generateStatusReport } from '../services/geminiService';
 
 const CONTROL_TABS = [
@@ -17,6 +16,11 @@ const CONTROL_TABS = [
 
 export const ControlModule: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // ── Risk Registry state (real data from API) ─────────────────
+  const [allRisks, setAllRisks] = useState<any[]>([]);
+  const [risksLoading, setRisksLoading] = useState(false);
+  const [risksLoaded, setRisksLoaded] = useState(false);
 
   // ── Feature 5: Reports state ─────────────────────────────
   const [projects, setProjects]         = useState<any[]>([]);
@@ -37,9 +41,36 @@ export const ControlModule: React.FC = () => {
     }
   };
 
+  // Load risks from all projects when risks tab is activated
+  const loadRisksIfNeeded = async () => {
+    if (risksLoaded) return;
+    setRisksLoading(true);
+    try {
+      const projects = await getProjects();
+      const riskArrays = await Promise.all(
+        projects.map((p: any) =>
+          getRisks(p.project_id).catch(() => [])
+        )
+      );
+      const flat = riskArrays.flat().map((r: any, i: number) => ({
+        ...r,
+        id: r.risk_id || r.id || i + 1,
+        title: r.risk_title || r.title || r.description || 'Unnamed Risk',
+        status: r.risk_level || r.severity || r.impact || 'Medium',
+      }));
+      setAllRisks(flat);
+      setRisksLoaded(true);
+    } catch (e) {
+      console.error('Failed to load risks:', e);
+    } finally {
+      setRisksLoading(false);
+    }
+  };
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     if (tab === 'reports') loadProjectsIfNeeded();
+    if (tab === 'risks') loadRisksIfNeeded();
   };
 
   const handleGenerateReport = async () => {
@@ -66,8 +97,8 @@ export const ControlModule: React.FC = () => {
     } catch (e: any) {
       console.error('[Report] Generation error:', e);
       const msg = e?.message || '';
-      if (msg.includes('fetch') || msg.includes('network') || msg.includes('5001')) {
-        setReportError('Cannot reach backend server. Ensure it is running on port 5001.');
+      if (msg.includes('fetch') || msg.includes('network') || msg.includes('5001') || msg.includes('VITE_API_BASE')) {
+        setReportError('Cannot reach the backend API. Set VITE_API_BASE on Vercel to your Render URL and redeploy.');
       } else if (msg.includes('API key') || msg.includes('apiKey')) {
         setReportError('Gemini API key is not configured. Set GEMINI_API_KEY in frontend/.env.local');
       } else {
@@ -131,23 +162,35 @@ Generated: ${new Date().toLocaleString()}
                   <h3 className="font-bold text-slate-900">Enterprise Risk Registry</h3>
                   <button className="bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all">Export Register</button>
                </div>
-               <DataTable 
-                  columns={[
-                    { header: 'ID', accessor: 'id' },
-                    { header: 'Risk Description', accessor: (item: any) => <span className="font-medium text-slate-800">{item.title}</span> },
-                    { header: 'Impact', accessor: (item: any) => (
-                      <span className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.status === 'High' ? COLORS.offTrack : COLORS.atRisk }} />
-                        <span className="font-bold">{item.status}</span>
-                      </span>
-                    )}
-                  ]}
-                  data={[
-                    { id: 'RSK-01', title: 'Global Supply Chain Bottleneck (Q4)', status: 'High' },
-                    { id: 'RSK-02', title: 'Regional Resource Shortage', status: 'Medium' },
-                    { id: 'RSK-03', title: 'Currency Volatility (EUR/USD)', status: 'Medium' }
-                  ]}
-                />
+               {risksLoading && (
+                 <div className="flex items-center justify-center py-16">
+                   <Loader2 size={24} className="animate-spin text-indigo-400" />
+                 </div>
+               )}
+               {!risksLoading && risksLoaded && allRisks.length === 0 && (
+                 <div className="flex flex-col items-center justify-center py-16 text-slate-400 space-y-2">
+                   <p className="text-sm font-semibold">No risks found</p>
+                   <p className="text-xs">Add risks inside individual projects via the Define module.</p>
+                 </div>
+               )}
+               {!risksLoading && allRisks.length > 0 && (
+                 <DataTable
+                   columns={[
+                     { header: 'ID', accessor: (item: any) => <span className="font-mono text-xs font-bold text-indigo-600">{item.risk_id ? `RSK-${String(item.risk_id).padStart(2,'0')}` : item.id}</span> },
+                     { header: 'Risk Description', accessor: (item: any) => <span className="font-medium text-slate-800">{item.title}</span> },
+                     { header: 'Impact', accessor: (item: any) => (
+                       <span className="flex items-center gap-2">
+                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor:
+                           item.status?.toLowerCase() === 'high' || item.status?.toLowerCase() === 'critical' ? COLORS.offTrack :
+                           item.status?.toLowerCase() === 'low' ? COLORS.onTrack : COLORS.atRisk
+                         }} />
+                         <span className="font-bold">{item.status}</span>
+                       </span>
+                     )}
+                   ]}
+                   data={allRisks}
+                 />
+               )}
             </div>
           )}
 

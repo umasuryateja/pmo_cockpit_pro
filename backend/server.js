@@ -1,7 +1,15 @@
 const express = require("express");
 const cors    = require("cors");
+const fs      = require("fs");
+const path    = require("path");
 
 console.log("Backend server file loaded");
+
+// Render ephemeral disk: ensure upload directory exists
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 const projectRoutes     = require("./routes/projects");
 const deliverableRoutes = require("./routes/deliverables");
@@ -20,21 +28,26 @@ const app = express();
 // ─────────────────────────────────────────────────────────────
 // CORS — allow specific frontend origins in production
 // ─────────────────────────────────────────────────────────────
+const normalizeOrigin = (url) => (url ? String(url).trim().replace(/\/$/, "") : null);
+
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173",
-  // Add your Vercel frontend URL here after deployment:
-  process.env.FRONTEND_URL,
+  normalizeOrigin(process.env.FRONTEND_URL),
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, Postman, server-to-server)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      // In development allow everything
       if (process.env.NODE_ENV !== "production") return callback(null, true);
+      // Allow Vercel production + preview deployments
+      if (/^https:\/\/[\w-]+\.vercel\.app$/.test(origin)) return callback(null, true);
+      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+        return callback(null, true);
+      }
+      console.warn("[CORS] Blocked origin:", origin);
       callback(new Error(`CORS blocked: ${origin}`));
     },
     credentials: true,
@@ -48,6 +61,25 @@ app.use(express.json({ limit: "10mb" }));
 // ─────────────────────────────────────────────────────────────
 app.get("/", (req, res) => res.json({ status: "ok", service: "PM Cockpit API" }));
 app.get("/test", (req, res) => res.json({ status: "Server working" }));
+
+const { verifyDatabaseConnection } = require("./db");
+app.get("/health/ready", async (req, res) => {
+  try {
+    const dbOk = await verifyDatabaseConnection();
+    res.json({
+      status: dbOk ? "ok" : "degraded",
+      database: dbOk ? "connected" : "unreachable",
+      environment: process.env.NODE_ENV || "development",
+    });
+  } catch (err) {
+    console.error("[Health] DB check failed:", err.message);
+    res.status(503).json({
+      status: "error",
+      database: "unreachable",
+      error: err.message,
+    });
+  }
+});
 
 // CORE ROUTES
 app.use("/projects",     projectRoutes);
@@ -92,10 +124,20 @@ app.post("/risks/ai-score/:riskId", async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 // Start server — use PORT env var (required by Render/Railway)
 // ─────────────────────────────────────────────────────────────
-const PORT = parseInt(process.env.PORT || "5001");
-app.listen(PORT, "0.0.0.0", () => {
+const PORT = parseInt(process.env.PORT || "5001", 10);
+app.listen(PORT, "0.0.0.0", async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`CORS FRONTEND_URL: ${process.env.FRONTEND_URL || "(not set — *.vercel.app still allowed)"}`);
   console.log("AI feature routes: /notes, /health, /kickoff, /reports");
   console.log("Risk AI scoring: POST /risks/ai-score/:riskId");
+  try {
+    const dbOk = await verifyDatabaseConnection();
+    console.log(dbOk ? "[DB] Connected to PostgreSQL" : "[DB] Connection check returned unexpected result");
+  } catch (err) {
+    console.error("[DB] Startup connection failed:", err.message);
+    if (process.env.NODE_ENV === "production") {
+      console.error("[DB] Fix DATABASE_URL on Render (Supabase URI, SSL enabled).");
+    }
+  }
 });

@@ -1,21 +1,18 @@
-import { getProjects } from "./services/api";
 import React, { useState, useEffect } from 'react';
-import { 
-  Bell, 
-  Search, 
-  User, 
-  Menu as MenuIcon, 
+import {
+  Bell,
+  Search,
+  Menu as MenuIcon,
   X,
-  ChevronRight,
   Gauge,
   Settings,
   Maximize,
   Minimize
 } from 'lucide-react';
 import { MainMenu } from './types';
-import { MENU_ICONS, COLORS } from './constants';
+import { MENU_ICONS } from './constants';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
-// Modular Components
 import { ControlModule } from './components/ControlModule';
 import DefineModule from "./components/DefineModule";
 import { PlanModule } from './components/PlanModule';
@@ -28,7 +25,6 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Sync fullscreen state with document events (e.g., if user hits Esc)
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -51,21 +47,26 @@ const App: React.FC = () => {
 
   const renderModule = () => {
     switch (activeMenu) {
-      case 'Control': return <ControlModule />;
-      case 'Define': return <DefineModule />;
-      case 'Plan': return <PlanModule />;
-      case 'Execute': return <ExecuteModule />;
-      case 'Configuration': return <ConfigModule />;
-      case 'AI Policies': return <AIPolicies />;
-      default: return <ControlModule />;
+      case 'Control':
+        return <ErrorBoundary moduleName="Control"><ControlModule /></ErrorBoundary>;
+      case 'Define':
+        return <ErrorBoundary moduleName="Define"><DefineModule /></ErrorBoundary>;
+      case 'Plan':
+        return <ErrorBoundary moduleName="Plan"><PlanModule /></ErrorBoundary>;
+      case 'Execute':
+        return <ErrorBoundary moduleName="Execute"><ExecuteModule /></ErrorBoundary>;
+      case 'Configuration':
+        return <ErrorBoundary moduleName="Configuration"><ConfigModule /></ErrorBoundary>;
+      case 'AI Policies':
+        return <ErrorBoundary moduleName="AI Policies"><AIPolicies /></ErrorBoundary>;
+      default:
+        return <ErrorBoundary moduleName="Control"><ControlModule /></ErrorBoundary>;
     }
   };
 
   return (
     <div className="min-h-screen flex text-slate-900 selection:bg-indigo-100">
-      {/* Sidebar - Solid Indigo Blue per UX principles */}
       <aside className={`bg-[#1F3A8A] text-white/70 w-72 fixed lg:static inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 z-30 flex flex-col shadow-2xl`}>
-        {/* Branding Section */}
         <div className="p-8 flex items-start gap-4 mb-4">
           <div className="bg-white/10 p-2.5 rounded-2xl backdrop-blur-sm border border-white/10 shadow-inner group transition-all hover:bg-white/20">
             <Gauge className="text-white" size={28} />
@@ -89,8 +90,8 @@ const App: React.FC = () => {
                 key={menuKey}
                 onClick={() => setActiveMenu(menuKey)}
                 className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[13px] font-bold transition-all group relative ${
-                  isActive 
-                    ? 'bg-white/10 text-white shadow-lg border border-white/10' 
+                  isActive
+                    ? 'bg-white/10 text-white shadow-lg border border-white/10'
                     : 'hover:bg-white/5 hover:text-white'
                 }`}
               >
@@ -119,9 +120,7 @@ const App: React.FC = () => {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-h-screen overflow-hidden bg-[#F8FAFC]">
-        {/* Header - Minimalist & Clean */}
         <header className="bg-white/80 backdrop-blur-md h-20 border-b border-slate-200 flex items-center justify-between px-10 sticky top-0 z-20 shadow-sm">
           <div className="flex items-center gap-6">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="lg:hidden p-2.5 hover:bg-slate-100 rounded-xl text-slate-600 transition-colors">
@@ -129,9 +128,9 @@ const App: React.FC = () => {
             </button>
             <div className="relative group hidden xl:block">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search Cockpit Resources..." 
+              <input
+                type="text"
+                placeholder="Search Cockpit Resources..."
                 className="pl-12 pr-6 py-2.5 bg-slate-50 border border-slate-100 rounded-2xl text-sm w-96 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none placeholder:text-slate-300 font-medium"
               />
             </div>
@@ -146,7 +145,7 @@ const App: React.FC = () => {
                </span>
             </div>
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={toggleFullScreen}
                 title={isFullscreen ? "Exit Full Screen" : "Enter Full Screen"}
                 className="p-2.5 text-slate-400 hover:text-[#1F3A8A] hover:bg-slate-50 rounded-xl transition-all"
@@ -164,7 +163,6 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        {/* Modular Content */}
         <div className="flex-1 overflow-y-auto p-10">
           {renderModule()}
         </div>
