@@ -4,7 +4,11 @@ import { GoogleGenAI, Type } from "@google/genai";
 // API KEY VALIDATION
 // Vite maps GEMINI_API_KEY → process.env.API_KEY via vite.config.ts define block
 // ─────────────────────────────────────────────────────────────────────────────
-const GEMINI_API_KEY = process.env.API_KEY || "";
+const GEMINI_API_KEY =
+  process.env.API_KEY ||
+  process.env.GEMINI_API_KEY ||
+  (import.meta.env.VITE_GEMINI_API_KEY as string | undefined) ||
+  "";
 
 const isKeyConfigured = (): boolean => {
   return (
