@@ -125,17 +125,25 @@ A core differentiator of PMO Cockpit Pro is its **strictly contextual AI reasoni
 
 ## 🖼️ 6. Screen Views
 
-### Portfolio Dashboard
+### 📊 Portfolio Dashboard (Executive Control)
 *The central command console visualizing portfolio distributions, active tasks, financial commitments, and key RAG indicators.*
-![Dashboard Placeholder](https://via.placeholder.com/1000x500/1e293b/ffffff?text=Dashboard+Portfolio+Performance+Analytics)
+![Portfolio Dashboard](assets/screenshots/01_executive_dashboard.png)
 
-### Project Definition & Health Scoring
-*The project entry grid and details workspace where users compute deterministic health indicators and trigger Gemini reviews.*
-![Define Module Placeholder](https://via.placeholder.com/1000x500/1e293b/ffffff?text=Project+Governance+%26+AI+Health+Analysis)
+### 📋 Project Registry & Definition
+*The workspace for creating, defining, and configuring high-level project charters, scope, client alignment, and strategic domains.*
+![Project Registry](assets/screenshots/02_project_definition.png)
 
-### Executive Board Reporting
-*The automated executive status report generator compiling financial metrics, risks, and milestone forecasts.*
-![AI Reports Placeholder](https://via.placeholder.com/1000x500/1e293b/ffffff?text=Executive+AI+Status+Reports+Workspace)
+### 🧠 Project Details & AI Governance
+*The comprehensive workspace showing quantitative and qualitative project metrics, live budget trackers, stakeholder mappings, and Gemini-driven health analyses.*
+![Project Governance and Health Scoring](assets/screenshots/03_project_details.png)
+
+### ⚡ Execution Workspace & Portfolios
+*A real-time project portfolio tracker providing PMO directors with high-fidelity progress indicators, deliverables mapping, and critical path tracking.*
+![Execution Workspace](assets/screenshots/04_execution_workspace.png)
+
+### 🛡️ AI Business Rules Engine
+*A generative AI playground allowing PMO administrators to write and persist formal project management and risk mitigation policies drafted by Gemini.*
+![AI Policies Engine](assets/screenshots/05_ai_policies.png)
 
 ---
 
