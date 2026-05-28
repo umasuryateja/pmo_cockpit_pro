@@ -308,7 +308,7 @@ The strategic roadmap for PMO Cockpit Pro includes:
 
 * **GitHub:** [@umasuryateja](https://github.com/umasuryateja)
 * **LinkedIn:** [Uma Surya Teja](https://linkedin.com/in/umasuryateja)
-* **Portfolio:** [umasuryateja.com](https://umasuryateja.com/)
+* **Portfolio:** [umasuryateja.com](https://surya-teja-portfolio-dun.vercel.app/)
 
 ---
 
